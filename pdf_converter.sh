@@ -21,7 +21,7 @@ mkdir -p cropped_images rectangles pdf_output
 # Check if we need to process images
 skip_processing=true
 
-if [ "$(find cropped_images -type f -name '*.png' | wc -l)" -eq 0 ]; then
+if [ "$(find cropped_images -type f -name '*.jpg' | wc -l)" -eq 0 ]; then
   echo "cropped_images folder is empty. Processing images..."
   skip_processing=false
 fi
@@ -34,18 +34,18 @@ fi
 # Only process images if necessary
 if [ "$skip_processing" = false ]; then
   echo "Cropping and splitting images..."
-
-  # List all images in the folder (assumes jpg and png images, add more extensions if needed)
-  for img in $(ls *.jpg *.png 2>/dev/null | sort -V); do
+  
+  # List all images in the input folder
+  for img in $(find input/ -type f \( -iname "*.jpg" -o -iname "*.png" \) | sort -V); do
     if [ -f "$img" ]; then
       echo "Processing $img"
 
       # 1. Crop the image to 2232x3117 with a top margin of 129 and left margin of 124
-      cropped="cropped_images/cropped_${img%.*}.jpg"
+      cropped="cropped_images/cropped_${img##*/}"
       magick "$img" -crop 2232x3117+124+129 "$cropped"
 
       # 2. Split the cropped image into 9 rectangles (3x3 grid)
-      rect_prefix="rectangles/rect_${img%.*}"
+      rect_prefix="rectangles/rect_${img##*/}"
       rect_width=$((2232 / 3))   # Correct width for each rectangle
       rect_height=$((3117 / 3))  # Correct height for each rectangle
 
@@ -92,7 +92,7 @@ if (( image_count == 0 )); then
   exit 1
 fi
 
-# Calculate the number of pages required
+# Calculate the number of pages required, rounded up
 images_per_page=$((tiles))
 page_count=$(( (image_count + images_per_page - 1) / images_per_page ))
 
@@ -100,8 +100,13 @@ page_count=$(( (image_count + images_per_page - 1) / images_per_page ))
 echo "Generating $page_count pages, with ${layout//x/×} tiles."
 
 # Generate pages with a black background and fill rows from top to bottom
-temp_dir=$(mktemp -d)
+
+#temp_dir=$(mktemp -d)
+mkdir -p assembled_pages
+temp_dir=assembled_pages/
+
 for ((page=0; page<page_count; page++)); do
+  echo "... page $((page + 1)) / $page_count"
   start=$((page * images_per_page))
   montage_input=()
 
@@ -117,21 +122,17 @@ for ((page=0; page<page_count; page++)); do
 
   # Explicitly quote filenames in the montage command
   montage "${montage_input[@]}" \
-    -tile "$layout" -geometry +0+0 -background black \
+    -tile "$layout" -geometry 744x1039+0+0 -background black \
     "$temp_dir/page_${page}.png"
 done
 
+
+echo "Combining all the pages"
 # Combine all pages into a single PDF
-if ls "$temp_dir"/page_*.png >/dev/null 2>&1; then
-  magick "$temp_dir"/page_*.png -quality 85 -define pdf:compress=jpeg "$output_pdf"
-else
-  echo "No pages generated for PDF. Exiting."
-  rm -r "$temp_dir"
-  exit 1
-fi
+find "$temp_dir" -name 'page_*.png' | sort -V | xargs  -I {} magick {} -quality 85 -define pdf:compress=jpeg "$output_pdf"
 
 # Clean up temporary files
-rm -r "$temp_dir"
+#rm -r "$temp_dir"
 
 echo "Processing complete! Check the cropped_images, rectangles, and pdf_output folders."
 
