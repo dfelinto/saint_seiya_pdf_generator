@@ -128,8 +128,9 @@ done
 
 
 echo "Combining all the pages"
-# Combine all pages into a single PDF
-find "$temp_dir" -name 'page_*.png' | sort -V | xargs  -I {} magick {} -quality 85 -define pdf:compress=jpeg "$output_pdf"
+
+image_files=$(find "$temp_dir" -name 'page_*.png' | sort -V | tr '\n' ' ')
+magick $image_files -quality 85 -define pdf:compress=jpeg "$output_pdf"
 
 # Clean up temporary files
 #rm -r "$temp_dir"
