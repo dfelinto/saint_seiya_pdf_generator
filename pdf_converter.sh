@@ -15,18 +15,24 @@ if [[ "$tiles" != "1" && "$tiles" != "4" && "$tiles" != "9" ]]; then
   exit 1
 fi
 
+BUILD=build
+CROPPED_IMAGES_DIR=$BUILD/cropped_images
+RECTANGLES_DIR=$BUILD/rectangles
+PDF_DIR=$BUILD/pdf_output
+ASSEMBLED_PAGES=$BUILD/assembled_pages
+
 # Ensure output directories exist
-mkdir -p cropped_images rectangles pdf_output
+mkdir -p $CROPPED_IMAGES_DIR $RECTANGLES_DIR $PDF_DIR $ASSEMBLED_PAGES
 
 # Check if we need to process images
 skip_processing=true
 
-if [ "$(find cropped_images -type f -name '*.jpg' | wc -l)" -eq 0 ]; then
+if [ "$(find "$CROPPED_IMAGES_DIR" -type f -name '*.jpg' | wc -l)" -eq 0 ]; then
   echo "cropped_images folder is empty. Processing images..."
   skip_processing=false
 fi
 
-if [ "$(find rectangles -type f -name '*.png' | wc -l)" -eq 0 ]; then
+if [ "$(find "$RECTANGLES_DIR" -type f -name '*.png' | wc -l)" -eq 0 ]; then
   echo "rectangles folder is empty. Processing images..."
   skip_processing=false
 fi
@@ -41,11 +47,11 @@ if [ "$skip_processing" = false ]; then
       echo "Processing $img"
 
       # 1. Crop the image to 2232x3117 with a top margin of 129 and left margin of 124
-      cropped="cropped_images/cropped_${img##*/}"
+      cropped="$CROPPED_IMAGES_DIR/cropped_${img##*/}"
       magick "$img" -crop 2232x3117+124+129 "$cropped"
 
       # 2. Split the cropped image into 9 rectangles (3x3 grid)
-      rect_prefix="rectangles/rect_${img##*/}"
+      rect_prefix="$RECTANGLES_DIR/rect_${img##*/}"
       rect_width=$((2232 / 3))   # Correct width for each rectangle
       rect_height=$((3117 / 3))  # Correct height for each rectangle
 
@@ -73,7 +79,7 @@ else
 fi
 
 # 3. Create the PDF with specified tiles per page
-output_pdf="pdf_output/saint_seiya_${tiles}.pdf"
+output_pdf="$PDF_DIR/saint_seiya_${tiles}.pdf"
 
 # Define tile layout based on the tiles parameter
 case $tiles in
@@ -83,7 +89,7 @@ case $tiles in
 esac
 
 # Ensure rectangles folder has images
-image_list=($(find rectangles -type f -name '*.png' | sort -V))
+image_list=($(find $RECTANGLES_DIR -type f -name '*.png' | sort -V))
 image_count=${#image_list[@]}
 
 # Check if there are any images to process
@@ -100,10 +106,6 @@ page_count=$(( (image_count + images_per_page - 1) / images_per_page ))
 echo "Generating $page_count pages, with ${layout//x/×} tiles."
 
 # Generate pages with a black background and fill rows from top to bottom
-
-#temp_dir=$(mktemp -d)
-mkdir -p assembled_pages
-temp_dir=assembled_pages/
 
 for ((page=0; page<page_count; page++)); do
   echo "... page $((page + 1)) / $page_count"
@@ -123,17 +125,13 @@ for ((page=0; page<page_count; page++)); do
   # Explicitly quote filenames in the montage command
   montage "${montage_input[@]}" \
     -tile "$layout" -geometry 744x1039+0+0 -background black \
-    "$temp_dir/page_${page}.png"
+    "$ASSEMBLED_PAGES/page_${page}.png"
 done
 
 
 echo "Combining all the pages"
 
-image_files=$(find "$temp_dir" -name 'page_*.png' | sort -V | tr '\n' ' ')
+image_files=$(find "$ASSEMBLED_PAGES" -name 'page_*.png' | sort -V | tr '\n' ' ')
 magick $image_files -quality 85 -define pdf:compress=jpeg "$output_pdf"
 
-# Clean up temporary files
-#rm -r "$temp_dir"
-
 echo "Processing complete! Check the cropped_images, rectangles, and pdf_output folders."
-
