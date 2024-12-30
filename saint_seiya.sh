@@ -32,7 +32,7 @@ mkdir -p $OUTPUT_DIR $CROPPED_IMAGES_DIR $RECTANGLES_DIR $PDF_DIR $ASSEMBLED_PAG
 # Check if we need to process images
 skip_processing=true
 
-if [ "$(find "$CROPPED_IMAGES_DIR" -type f -name '*.jpg' | wc -l)" -eq 0 ]; then
+if [ "$(find "$CROPPED_IMAGES_DIR" -type f -name '*.png' | wc -l)" -eq 0 ]; then
   echo "cropped_images folder is empty. Processing images..."
   skip_processing=false
 fi
@@ -45,42 +45,42 @@ fi
 # Only process images if necessary
 if [ "$skip_processing" = false ]; then
   echo "Cropping and splitting images..."
-  
+
   # List all images in the input folder
-  for img in $(find input/ -type f \( -iname "*.jpg" -o -iname "*.png" \) | sort -V); do
-    if [ -f "$img" ]; then
-      echo "Processing $img"
+  for img in $(find input -type f \( -iname "*.jpg" -o -iname "*.png" \) | sort -V); do
+    echo "Processing $img"
 
-      # 1. Crop the image to 2232x3117 with a top margin of 129 and left margin of 124
-      cropped="$CROPPED_IMAGES_DIR/cropped_${img##*/}"
-      magick "$img" -crop 2232x3117+124+129 "$cropped"
+    # Crop the image to 2232x3117 with a top margin of 129 and left margin of 124
+    # +repage is needed otherwise the coordinates/offset will fail when trying to crop
+    # the individual rectangles.
+    cropped="$CROPPED_IMAGES_DIR/cropped_${img##*/}"
+    cropped="${cropped%.*}.png"
+    magick "$img" -crop 2232x3117+124+129 +repage "$cropped"
 
-      # 2. Split the cropped image into 9 rectangles (3x3 grid)
-      rect_prefix="$RECTANGLES_DIR/rect_${img##*/}"
-      rect_width=$((2232 / 3))   # Correct width for each rectangle
-      rect_height=$((3117 / 3))  # Correct height for each rectangle
+    # Split the cropped image into 9 rectangles (3x3 grid).
+    rect_prefix="$RECTANGLES_DIR/rect_${img##*/}"
+    rect_width=$((2232 / 3))   # Correct width for each rectangle
+    rect_height=$((3117 / 3))  # Correct height for each rectangle
 
-      for row in {0..2}; do
-        for col in {0..2}; do
-          x_offset=$((col * rect_width))
-          y_offset=$((row * rect_height))
-          rect_path="${rect_prefix}_${row}_${col}.png"
+    for row in {0..2}; do
+      for col in {0..2}; do
+        x_offset=$((col * rect_width))
+        y_offset=$((row * rect_height))
+        rect_path="${rect_prefix}_${row}_${col}.png"
 
-          # Crop each rectangle precisely
-          magick "$cropped" -crop ${rect_width}x${rect_height}+${x_offset}+${y_offset} "$rect_path"
+        # Crop each rectangle precisely
+        magick "$cropped" -crop ${rect_width}x${rect_height}+${x_offset}+${y_offset} "$rect_path"
 
-          # Check file size and delete if too small
-          min_size=100000  # Minimum size in bytes
-          file_size=$(wc -c < "$rect_path")
-          if (( file_size < min_size )); then
-            rm "$rect_path"
-          fi
-        done
+        # Check file size and delete if too small
+        min_size=100000  # Minimum size in bytes
+        file_size=$(wc -c < "$rect_path")
+        if (( file_size < min_size )); then
+          rm "$rect_path"
+        fi
       done
-    fi
+    done
+
   done
-else
-  echo "Skipping cropping and splitting; images already present."
 fi
 
 # Define tile layout based on the tiles parameter
