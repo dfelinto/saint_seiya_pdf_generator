@@ -15,14 +15,19 @@ if [[ "$tiles" != "1" && "$tiles" != "4" && "$tiles" != "9" ]]; then
   exit 1
 fi
 
+OUTPUT_DIR=output
 BUILD=build
 CROPPED_IMAGES_DIR=$BUILD/cropped_images
 RECTANGLES_DIR=$BUILD/rectangles
-PDF_DIR=$BUILD/pdf_output
 ASSEMBLED_PAGES=$BUILD/assembled_pages
+PDF_DIR=$BUILD/pdf
+
+# Need to clean the assembled pages, since
+# it may contain pages from previous tiling
+rm -rf $ASSEMBLED_PAGES
 
 # Ensure output directories exist
-mkdir -p $CROPPED_IMAGES_DIR $RECTANGLES_DIR $PDF_DIR $ASSEMBLED_PAGES
+mkdir -p $OUTPUT_DIR $CROPPED_IMAGES_DIR $RECTANGLES_DIR $PDF_DIR $ASSEMBLED_PAGES
 
 # Check if we need to process images
 skip_processing=true
@@ -78,9 +83,6 @@ else
   echo "Skipping cropping and splitting; images already present."
 fi
 
-# 3. Create the PDF with specified tiles per page
-output_pdf="$PDF_DIR/saint_seiya_${tiles}.pdf"
-
 # Define tile layout based on the tiles parameter
 case $tiles in
   1) layout="1x1"; page_width=744; page_height=1039 ;;
@@ -131,7 +133,25 @@ done
 
 echo "Combining all the pages"
 
-image_files=$(find "$ASSEMBLED_PAGES" -name 'page_*.png' | sort -V | tr '\n' ' ')
-magick $image_files -quality 85 -define pdf:compress=jpeg "$output_pdf"
+uncompressed_pdf="$PDF_DIR/intermedium_${tiles}.pdf"
+output_pdf="$OUTPUT_DIR/saint_seiya_${tiles}.pdf"
 
-echo "Processing complete! Check the cropped_images, rectangles, and pdf_output folders."
+
+image_files=$(find "$ASSEMBLED_PAGES" -name 'page_*.png' | sort -V | tr '\n' ' ')
+magick $image_files -quality 85 -define pdf:compress=jpeg "$uncompressed_pdf"
+
+echo "Generating compressed PDF"
+
+# Compress the PDF
+#
+# -dPDFSETTINGS=/screen lower quality, smaller size. (72 dpi)
+# -dPDFSETTINGS=/ebook for better quality, but slightly larger pdfs. (150 dpi)
+# -dPDFSETTINGS=/prepress output similar to Acrobat Distiller "Prepress Optimized" setting (300 dpi)
+# -dPDFSETTINGS=/printer selects output similar to the Acrobat Distiller "Print Optimized" setting (300 dpi)
+# -dPDFSETTINGS=/default selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file
+
+gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen \
+   -dNOPAUSE -dQUIET -dBATCH -sOutputFile="$output_pdf" "$uncompressed_pdf"
+
+echo "Processing complete! File generated: $output_pdf."
+echo "Remove the \"build\" folder to remove the cropped_images, rectangles, and pdf_output folders."
