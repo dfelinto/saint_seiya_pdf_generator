@@ -138,7 +138,7 @@ output_pdf="$OUTPUT_DIR/saint_seiya_${tiles}.pdf"
 
 
 image_files=$(find "$ASSEMBLED_PAGES" -name 'page_*.png' | sort -V | tr '\n' ' ')
-magick $image_files -quality 85 -define pdf:compress=jpeg "$uncompressed_pdf"
+magick $image_files "$uncompressed_pdf"
 
 echo "Generating compressed PDF"
 
