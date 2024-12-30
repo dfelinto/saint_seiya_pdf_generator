@@ -151,7 +151,7 @@ echo "Generating compressed PDF"
 # -dPDFSETTINGS=/default selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file
 
 gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen \
-   -dNOPAUSE -dQUIET -dBATCH -sOutputFile="$output_pdf" "$uncompressed_pdf"
+   -dNOPAUSE -dQUIET -dBATCH -sOutputFile="$output_pdf" "$uncompressed_pdf" 2>/dev/null
 
 echo "Processing complete! File generated: $output_pdf."
 echo "Remove the \"build\" folder to remove the cropped_images, rectangles, and pdf_output folders."
