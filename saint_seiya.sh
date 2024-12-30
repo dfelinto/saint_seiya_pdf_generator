@@ -110,7 +110,8 @@ echo "Generating $page_count pages, with ${layout//x/×} tiles."
 # Generate pages with a black background and fill rows from top to bottom
 
 for ((page=0; page<page_count; page++)); do
-  echo "... page $((page + 1)) / $page_count"
+  # Leave it commented out since it runs too fast
+  # echo "... page $((page + 1)) / $page_count"
   start=$((page * images_per_page))
   montage_input=()
 
@@ -125,10 +126,16 @@ for ((page=0; page<page_count; page++)); do
   done
 
   # Explicitly quote filenames in the montage command
+  # Run in background mode to run multiple processes at once
   montage "${montage_input[@]}" \
     -tile "$layout" -geometry 744x1039+0+0 -background black \
-    "$ASSEMBLED_PAGES/page_${page}.png"
+    "$ASSEMBLED_PAGES/page_${page}.png" &
 done
+
+# Wait for all the processes to be done.
+echo "... waiting for new pages"
+wait
+echo "... done"
 
 
 echo "Combining all the pages"
